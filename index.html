@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>졸음 감지</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main id="app">
+    <!-- ===== 0단계: 동의 / 안내 ===== -->
+    <section id="screen-consent" class="screen active">
+      <div class="consent-wrap">
+        <h1 class="consent-title">시선 보정 안내</h1>
+        <div class="consent-body">
+          <p>정확한 시선 확인을 위해 <b>시선 보정</b>이 필요합니다.</p>
+          <p>3초 정도 화면 정면을 바라봐 주세요.</p>
+          <p class="consent-privacy">
+            촬영된 영상은 감지를 위해서만 사용되며,<br />
+            그 외의 목적으로는 사용되지 않습니다.
+          </p>
+        </div>
+        <button id="consentBtn" class="btn btn-primary consent-btn">
+          위 내용을 숙지했으며, 영상 촬영에 동의합니다
+        </button>
+        <p id="consentError" class="consent-error" hidden>
+          카메라를 사용할 수 없습니다. 권한을 허용한 뒤 새로고침 해주세요.
+        </p>
+      </div>
+    </section>
+
+    <!-- ===== 1단계: 캘리브레이션(시선 보정) ===== -->
+    <section id="screen-calibration" class="screen">
+      <div class="calib-wrap">
+        <h1 class="calib-title">눈을 뜬 상태로 정면을 바라봐 주세요</h1>
+
+        <!-- 카메라 스테이지 -->
+        <div id="calibCameraSlot" class="camera-slot">
+          <div id="cameraContainer" class="camera-container">
+            <video id="sourceVideo" autoplay playsinline muted></video>
+            <canvas id="overlay"></canvas>
+          </div>
+        </div>
+
+        <div class="calib-count-wrap">
+          <span id="calibCount" class="calib-count">3</span>
+          <p class="calib-sub">기준값을 측정하고 있어요</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 2단계: 멤버 선택 ===== -->
+    <section id="screen-menu" class="screen">
+      <div class="menu-wrap">
+        <h1 class="menu-title">잠을 깨워줄 멤버를 골라주세요</h1>
+        <div id="memberGrid" class="member-grid"><!-- JS로 카드 생성 --></div>
+      </div>
+    </section>
+
+    <!-- ===== 3단계: 메인 감지 ===== -->
+    <section id="screen-detection" class="screen">
+      <div class="detect-wrap">
+        <header class="detect-header">
+          <span class="detect-badge">감지 중</span>
+          <button id="backToMenuBtn" class="btn btn-ghost">메뉴로 돌아가기</button>
+        </header>
+
+        <div class="detect-stage">
+          <div id="detectCameraSlot" class="camera-slot"></div>
+
+          <!-- 졸음 경고 오버레이 -->
+          <div id="warningSubtitle" class="warning-subtitle" hidden>
+            5초 이내에 눈이 인식되지 않으면 알람이 재생됩니다
+          </div>
+          <div id="countdownNumber" class="countdown-number" hidden>5</div>
+
+          <!-- 일시정지 안내 -->
+          <div id="pausedBanner" class="paused-banner" hidden>
+            <span>감지가 일시정지되었습니다</span>
+            <button id="resumeBtn" class="btn btn-small">감지 재시작</button>
+          </div>
+        </div>
+
+        <div class="detect-controls">
+          <button id="ignoreBtn" class="btn btn-outline">
+            눈을 뜨고 있는데 인식이 안돼요
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 4단계: 알람 재생 ===== -->
+    <section id="screen-alarm" class="screen">
+      <div class="alarm-wrap">
+        <video id="alarmVideo" class="alarm-video" playsinline></video>
+        <button id="dismissBtn" class="btn btn-primary alarm-dismiss">알람 해제</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- MediaPipe Face Mesh -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+  <script src="script.js"></script>
+</body>
+</html>
