@@ -122,7 +122,6 @@ function startCalibration() {
   calibStart = null;
   calibSamples = [];
   calibCountEl.textContent = "3";
-  requestWakeLock(); // 동의 클릭(제스처) 시점에 화면 켜짐 유지 요청
   placeCamera("calibCameraSlot");
   showScreen("calibration");
 }
@@ -449,7 +448,7 @@ function onResults(results) {
 // 초기화
 // =========================================================
 function initEvents() {
-  consentBtn.addEventListener("click", startCalibration);
+  consentBtn.addEventListener("click", onConsent);
   document.getElementById("backToMenuBtn").addEventListener("click", goToMenu);
   document.getElementById("dismissBtn").addEventListener("click", dismissAlarm);
   document.getElementById("resumeBtn").addEventListener("click", togglePause);
@@ -514,7 +513,7 @@ async function initCamera() {
   });
   faceMesh.onResults(onResults);
 
-  // Camera 유틸이 getUserMedia 를 호출 → 진입 시 자동으로 권한 요청
+  // Camera 유틸이 getUserMedia 를 호출 → 권한 요청
   const camera = new Camera(sourceVideo, {
     onFrame: async () => {
       await faceMesh.send({ image: sourceVideo });
@@ -526,8 +525,39 @@ async function initCamera() {
   try {
     await camera.start();
     consentError.hidden = true;
+    return true;
   } catch (err) {
     console.error("카메라 시작 실패:", err);
+    consentError.hidden = false;
+    return false;
+  }
+}
+
+// "동의합니다" 탭 시점에 카메라 권한 요청 (모바일은 사용자 제스처가 있어야 권한창이 뜸)
+let cameraStarted = false;
+async function onConsent() {
+  requestWakeLock(); // 제스처 안에서 화면 켜짐 유지 요청
+
+  if (cameraStarted) {
+    startCalibration();
+    return;
+  }
+
+  consentBtn.disabled = true;
+  consentBtn.textContent = "카메라 준비 중…";
+  consentError.hidden = true;
+
+  // 영상 요소를 먼저 보이게 한 뒤 카메라 시작 (모바일은 숨겨진 video 재생이 막힘)
+  startCalibration();
+  const ok = await initCamera();
+
+  consentBtn.disabled = false;
+  consentBtn.textContent = "위 내용을 숙지했으며, 영상 촬영에 동의합니다";
+
+  if (ok) {
+    cameraStarted = true;
+  } else {
+    showScreen("consent"); // 권한 거부/오류 시 동의 화면으로 복귀
     consentError.hidden = false;
   }
 }
@@ -535,8 +565,7 @@ async function initCamera() {
 window.addEventListener("DOMContentLoaded", () => {
   buildMemberCards();
   initEvents();
-  showScreen("consent"); // 동의 화면부터 시작
-  initCamera(); // 권한은 진입 시 자동 요청
+  showScreen("consent"); // 동의 화면부터 시작 (카메라는 동의 탭 시 시작)
 });
 "use strict";
 
@@ -662,7 +691,6 @@ function startCalibration() {
   calibStart = null;
   calibSamples = [];
   calibCountEl.textContent = "3";
-  requestWakeLock(); // 동의 클릭(제스처) 시점에 화면 켜짐 유지 요청
   placeCamera("calibCameraSlot");
   showScreen("calibration");
 }
@@ -989,7 +1017,7 @@ function onResults(results) {
 // 초기화
 // =========================================================
 function initEvents() {
-  consentBtn.addEventListener("click", startCalibration);
+  consentBtn.addEventListener("click", onConsent);
   document.getElementById("backToMenuBtn").addEventListener("click", goToMenu);
   document.getElementById("dismissBtn").addEventListener("click", dismissAlarm);
   document.getElementById("resumeBtn").addEventListener("click", togglePause);
@@ -1054,7 +1082,7 @@ async function initCamera() {
   });
   faceMesh.onResults(onResults);
 
-  // Camera 유틸이 getUserMedia 를 호출 → 진입 시 자동으로 권한 요청
+  // Camera 유틸이 getUserMedia 를 호출 → 권한 요청
   const camera = new Camera(sourceVideo, {
     onFrame: async () => {
       await faceMesh.send({ image: sourceVideo });
@@ -1066,8 +1094,39 @@ async function initCamera() {
   try {
     await camera.start();
     consentError.hidden = true;
+    return true;
   } catch (err) {
     console.error("카메라 시작 실패:", err);
+    consentError.hidden = false;
+    return false;
+  }
+}
+
+// "동의합니다" 탭 시점에 카메라 권한 요청 (모바일은 사용자 제스처가 있어야 권한창이 뜸)
+let cameraStarted = false;
+async function onConsent() {
+  requestWakeLock(); // 제스처 안에서 화면 켜짐 유지 요청
+
+  if (cameraStarted) {
+    startCalibration();
+    return;
+  }
+
+  consentBtn.disabled = true;
+  consentBtn.textContent = "카메라 준비 중…";
+  consentError.hidden = true;
+
+  // 영상 요소를 먼저 보이게 한 뒤 카메라 시작 (모바일은 숨겨진 video 재생이 막힘)
+  startCalibration();
+  const ok = await initCamera();
+
+  consentBtn.disabled = false;
+  consentBtn.textContent = "위 내용을 숙지했으며, 영상 촬영에 동의합니다";
+
+  if (ok) {
+    cameraStarted = true;
+  } else {
+    showScreen("consent"); // 권한 거부/오류 시 동의 화면으로 복귀
     consentError.hidden = false;
   }
 }
@@ -1075,6 +1134,5 @@ async function initCamera() {
 window.addEventListener("DOMContentLoaded", () => {
   buildMemberCards();
   initEvents();
-  showScreen("consent"); // 동의 화면부터 시작
-  initCamera(); // 권한은 진입 시 자동 요청
+  showScreen("consent"); // 동의 화면부터 시작 (카메라는 동의 탭 시 시작)
 });
