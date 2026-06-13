@@ -215,12 +215,15 @@ function primeAlarmVideo(member) {
           alarmVideo.muted = false;
           return;
         }
+        // 잠금 해제용으로만 잠깐 재생하고 즉시 정지한다.
+        // 음소거는 그대로 유지(muted) → 감지 화면에서 iOS가 이 영상을
+        // 임의로 재생해도 소리가 새어나오지 않음.
+        // 실제 알람 때 playAlarmVideo()에서 muted=false 로 소리를 켠다.
         alarmVideo.pause();
         alarmVideo.currentTime = 0;
-        alarmVideo.muted = false;
       })
       .catch(() => {
-        alarmVideo.muted = false;
+        /* 자동재생 차단: 음소거 상태 그대로 둔다 */
       });
   }
 }
@@ -234,6 +237,13 @@ function startDetection() {
   updatePauseUI();
   placeCamera("detectCameraSlot");
   showScreen("detection");
+
+  // iOS 대비: 직전에 알람 영상이 재생되면서 카메라(sourceVideo)가
+  // 멈춰버리는 경우가 있어, 감지 화면에 들어올 때 카메라를 다시 재생시킨다.
+  // (카메라가 멈추면 얼굴 인식 루프가 멎어 타이머가 동작하지 않음)
+  if (sourceVideo.srcObject) {
+    sourceVideo.play().catch(() => {});
+  }
 }
 
 function resetDetectionTimers() {
