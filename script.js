@@ -55,6 +55,8 @@ const countdownNumber = document.getElementById("countdownNumber");
 const pausedBanner = document.getElementById("pausedBanner");
 const ignoreBtn = document.getElementById("ignoreBtn");
 const alarmVideo = document.getElementById("alarmVideo");
+const alarmPlayBtn = document.getElementById("alarmPlayBtn");
+const soundHint = document.getElementById("soundHint");
 
 const screens = {
   consent: document.getElementById("screen-consent"),
@@ -95,6 +97,21 @@ function placeCamera(slotId) {
   }
 }
 
+// ===== 화면 꺼짐 방지 (Wake Lock) =====
+// 자동잠금으로 화면이 꺼지면 감지·알람이 멈추므로, 화면을 계속 켜둠
+let wakeLock = null;
+async function requestWakeLock() {
+  if (!("wakeLock" in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener("release", () => {
+      wakeLock = null;
+    });
+  } catch (err) {
+    console.warn("화면 켜짐 유지 실패:", err);
+  }
+}
+
 // =========================================================
 // 1단계: 캘리브레이션 (시선 보정)
 // =========================================================
@@ -105,6 +122,7 @@ function startCalibration() {
   calibStart = null;
   calibSamples = [];
   calibCountEl.textContent = "3";
+  requestWakeLock(); // 동의 클릭(제스처) 시점에 화면 켜짐 유지 요청
   placeCamera("calibCameraSlot");
   showScreen("calibration");
 }
@@ -177,7 +195,31 @@ function goToMenu() {
 
 function selectMember(member) {
   App.selectedMember = member;
+  // 사용자 클릭(제스처) 중에 영상을 미리 "잠금 해제" → 나중에 타이머로 자동재생 가능
+  primeAlarmVideo(member);
   startDetection();
+}
+
+// 영상을 음소거로 잠깐 재생했다 멈춰서, 이후 자동재생 차단을 회피
+function primeAlarmVideo(member) {
+  const src = `videos/${member.id}.mp4`;
+  if (alarmVideo.getAttribute("src") !== src) {
+    alarmVideo.src = src;
+  }
+  alarmVideo.muted = true;
+  const p = alarmVideo.play();
+  if (p && p.then) {
+    p
+      .then(() => {
+        alarmVideo.pause();
+        alarmVideo.currentTime = 0;
+        alarmVideo.muted = false;
+      })
+      .catch(() => {
+        // 잠금 해제 실패해도 알람 단계의 재생 버튼으로 대응됨
+        alarmVideo.muted = false;
+      });
+  }
 }
 
 // =========================================================
@@ -300,28 +342,73 @@ function updatePauseUI() {
 // =========================================================
 const ALARM_MAX_PLAYS = 3; // 해제 안 하면 최대 3회 반복
 let alarmPlayCount = 0;
+let dismissing = false; // 알람 해제 중에는 pause 핸들러 무시
 
 function goToAlarm() {
   resetDetectionTimers();
   showScreen("alarm");
+  alarmPlayBtn.hidden = true;
+  soundHint.hidden = true;
   if (App.selectedMember) {
     alarmPlayCount = 1;
-    alarmVideo.src = `videos/${App.selectedMember.id}.mp4`;
+    const src = `videos/${App.selectedMember.id}.mp4`;
+    if (alarmVideo.getAttribute("src") !== src) alarmVideo.src = src;
     alarmVideo.currentTime = 0;
-    alarmVideo.play().catch(() => {
-      /* 자동재생 차단 시 사용자 상호작용 후 재생됨 */
-    });
+    playAlarmVideo();
   }
 }
 
+// 알람 영상 재생.
+// 1) 소리까지 자동재생을 시도하고,
+// 2) 막히면(무음모드/iOS 등) 음소거로라도 영상을 자동으로 띄워 시각 알람 보장,
+// 3) 음소거 재생까지 막히면(드묾) 재생 버튼 노출.
+function playAlarmVideo() {
+  alarmVideo.muted = false;
+  const p = alarmVideo.play();
+  if (p && p.then) {
+    p
+      .then(() => {
+        // 소리까지 정상 자동재생됨
+        alarmPlayBtn.hidden = true;
+        soundHint.hidden = true;
+      })
+      .catch(() => {
+        // 소리 있는 자동재생 차단 → 음소거로라도 영상은 자동 재생
+        alarmVideo.muted = true;
+        alarmVideo
+          .play()
+          .then(() => {
+            soundHint.hidden = false; // "탭하면 소리가 켜집니다"
+            alarmPlayBtn.hidden = true;
+          })
+          .catch((err) => {
+            console.warn("알람 영상 자동재생 완전 차단됨:", err);
+            alarmPlayBtn.hidden = false; // 최후 수단: 직접 재생 버튼
+          });
+      });
+  }
+}
+
+// 사용자가 탭해서 소리를 켜는 동작 (음소거 자동재생 상태에서)
+function enableAlarmSound() {
+  alarmVideo.muted = false;
+  alarmVideo.play().catch(() => {});
+  alarmPlayBtn.hidden = true;
+  soundHint.hidden = true;
+}
+
 function dismissAlarm() {
+  dismissing = true;
   alarmVideo.pause();
   alarmVideo.removeAttribute("src");
   alarmVideo.load();
+  alarmPlayBtn.hidden = true;
+  soundHint.hidden = true;
   App.selectedMember = null;
   App.paused = false;
   // 멤버 선택 메뉴(2단계)로 복귀 (시선 보정값은 그대로 유지)
   goToMenu();
+  dismissing = false;
 }
 
 // =========================================================
@@ -369,13 +456,34 @@ function initEvents() {
     if (alarmPlayCount < ALARM_MAX_PLAYS) {
       alarmPlayCount++;
       alarmVideo.currentTime = 0;
-      alarmVideo.play().catch(() => {});
+      playAlarmVideo();
+    }
+  });
+
+  // 재생 버튼 / 영상 영역 탭: 소리 켜기 (음소거 자동재생 또는 완전 차단 시 대비)
+  alarmPlayBtn.addEventListener("click", enableAlarmSound);
+  soundHint.addEventListener("click", enableAlarmSound);
+  document
+    .querySelector(".alarm-video-wrap")
+    .addEventListener("click", enableAlarmSound);
+
+  // 재생 도중 예기치 않게 멈추면(헤드폰 연결 등 오디오 출력 전환) 재생 버튼 노출
+  alarmVideo.addEventListener("pause", () => {
+    if (!dismissing && App.state === "alarm" && !alarmVideo.ended) {
+      alarmPlayBtn.hidden = false;
     }
   });
 
   sourceVideo.addEventListener("loadedmetadata", () => {
     overlay.width = sourceVideo.videoWidth || 640;
     overlay.height = sourceVideo.videoHeight || 480;
+  });
+
+  // 탭이 다시 보이면 화면 켜짐 유지 재요청 (자동 해제 대응)
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && wakeLock === null) {
+      requestWakeLock();
+    }
   });
 }
 
