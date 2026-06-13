@@ -19,6 +19,10 @@
             촬영된 영상은 감지를 위해서만 사용되며,<br />
             그 외의 목적으로는 사용되지 않습니다.
           </p>
+          <p class="consent-ios">
+            📱 아이폰·아이패드는 <b>무음 모드를 꺼주세요.</b><br />
+            무음 모드에서는 알람 소리가 재생되지 않습니다.
+          </p>
         </div>
         <button id="consentBtn" class="btn btn-primary consent-btn">
           위 내용을 숙지했으며, 영상 촬영에 동의합니다
@@ -92,7 +96,13 @@
     <!-- ===== 4단계: 알람 재생 ===== -->
     <section id="screen-alarm" class="screen">
       <div class="alarm-wrap">
-        <video id="alarmVideo" class="alarm-video" playsinline></video>
+        <div class="alarm-video-wrap">
+          <video id="alarmVideo" class="alarm-video" playsinline></video>
+          <!-- 음소거로 자동재생 중일 때: 탭하면 소리 켜짐 -->
+          <div id="soundHint" class="sound-hint" hidden>🔇 화면을 탭하면 소리가 켜집니다</div>
+          <!-- 영상 자체가 자동재생되지 않은 경우: 직접 눌러서 재생 -->
+          <button id="alarmPlayBtn" class="alarm-play" hidden>▶ 영상 재생</button>
+        </div>
         <button id="dismissBtn" class="btn btn-primary alarm-dismiss">알람 해제</button>
       </div>
     </section>
